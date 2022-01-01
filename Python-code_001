@@ -1,1 +1,348 @@
-#
+#######################################################
+#######  ディープラーニング占いの館　LOTO７
+#######################################################
+
+##### 
+##### 初期セットアップ
+##### 
+import os
+import csv
+import datetime
+import tensorflow.data              as tf_data
+import tensorflow.random            as tf_random
+import tensorflow.keras.optimizers  as optimizers
+
+from keras.models     import Sequential
+from keras.layers     import LSTM
+from keras.layers     import Dense
+from keras            import initializers
+from keras.callbacks  import EarlyStopping
+from IPython.display  import clear_output
+ 
+import matplotlib.pyplot as plt
+import numpy             as np
+import pandas            as pd
+import random            as rn
+
+#####　乱数用の基礎数値の設定
+seed_num = 7
+os.environ['PYTHONHASHSEED'] = '0'
+np.random.seed(seed_num)
+rn.seed(seed_num)
+tf_random.set_seed(seed_num)
+#####　
+clear_message = False
+#####
+
+#####
+##### ファイルの読み込み
+#####
+
+def read_file():
+    csv_path = 'Z:\\ディープラーニング占いの館\\Loto7\\pyData\\normal7.csv'
+    dfw = pd.read_csv(csv_path)
+    dfw.head()
+    return dfw
+
+#####
+##### 過去の結果のサンプリング
+#####
+
+#####　トレーニングとバリデーション用のデータを作成
+def variate_data(dataset, target, start_index, end_index, history_size,
+                                     target_size, step, single_step=False):
+    data = []
+    labels = []
+ 
+    start_index = start_index + history_size
+    if end_index is None:
+        end_index = len(dataset) - target_size  + 1
+        
+    for i in range(start_index, end_index):
+        indices = range(i-history_size, i, step)
+        data.append(dataset[indices])
+ 
+        t_num = target_size 
+        if single_step:
+            labels.append(target[i+t_num-1])
+        else:
+            labels.append(target[i:i+t_num-1])
+ 
+    return np.array(data), np.array(labels)
+
+#####　予想用のデータを作成
+def pred_data(dataset, history_size, future_target):
+    data = []
+    labels = []
+ 
+    start_index = len(dataset)-history_size
+    end_index   = len(dataset) 
+    indices = range(start_index,end_index)
+    data.append(dataset[indices])
+ 
+    return np.array(data)
+
+def clear_msg():
+    if clear_message == True:
+        clear_output()
+
+####  
+#####  予想の基礎データの作成
+##### 
+
+##### ファイルを読み込み必要なデータだけにする
+df = read_file()
+features_considered = ['val1', 'val2', 'val3', 'val4', 'val5', 'val6', 'val7']
+features = df[features_considered]
+features.index = df['num']
+
+##### 次の開催回の作成print（len（features））
+nbr_max_array = df['num'].values
+nbr_max = np.amax(nbr_max_array)
+nbr_next = nbr_max + 1
+
+##### 予想結果のファイル名の作成
+file_name = 'Z:\\ディープラーニング占いの館\\Loto7\\pyResult\\result7_2_' +str(seed_num) + '_' +  str(nbr_next) + '.csv'
+if os.path.isfile(file_name):
+    print('**************************')
+    print('***** すでに作成済み *****')
+    print('**************************')
+    print('')
+    #exit()
+
+##### トレーニングとバリデーションの割合を設定
+TRAIN_SPLIT = int(len(features) * 0.2)
+
+##### データの標準化
+dataset = features.values
+data_mean = np.mean(dataset[TRAIN_SPLIT:]) #.mean(axis=0)
+data_std = np.std(dataset[TRAIN_SPLIT:])   #.std(axis=0)
+
+### データ作成パラメタ
+PAST_HISTORY = 8
+FUTURE_TARGET = 1
+STEP = 1
+#####　トレーニングデータの作成
+x_train, y_train = variate_data(dataset, dataset, 
+                                    TRAIN_SPLIT-PAST_HISTORY, None , PAST_HISTORY,
+                                    FUTURE_TARGET, STEP,
+                                    single_step=True)  
+
+#####　バリデーションデータの作成
+x_val, y_val = variate_data(dataset, dataset,
+                                    0, TRAIN_SPLIT, PAST_HISTORY,
+                                    FUTURE_TARGET, STEP,
+                                    single_step=True)
+
+#####　予想データの作成
+x_pred = pred_data(dataset, PAST_HISTORY, FUTURE_TARGET)
+
+clear_msg()
+
+print ('Read data shape 　   : {}'.format(dataset.shape))
+print ('Train data shape X   : {}'.format(x_train.shape))
+print ('Train data shape Y   : {}'.format(y_train.shape))
+print ('Validate data shape X: {}'.format(x_val.shape))
+print ('Validate data shape Y: {}'.format(y_val.shape))
+print ('Pred data shape X    : {}'.format(x_pred.shape))
+print('')
+print('************* Read data *************')
+print('*** Head ')
+print(features.head(14))
+print('*** Tail ')
+print(features.tail(14))
+print('Read data 全行数 : {}'.format(len(features)))
+print('次の開催回       : {}'.format(nbr_next))
+
+clear_msg()
+
+print('************* Validate data X *************')
+print(x_val[0])
+print('')
+print('       ||')
+print('       VV')
+print('')
+print(x_val[1])
+print('')
+print('       ||')
+print('       VV')
+print('')
+print(x_val[len(x_val)-1])
+print('************* Validate data Y *************')
+print(y_val[0])
+print('')
+print('       ||')
+print('       VV')
+print('')
+print(y_val[1])
+print('')
+print('       ||')
+print('       VV')
+print('')
+print(y_val[len(y_val)-1])
+
+clear_msg()
+
+print('************* Train data X *************')
+print(x_train[0])
+print('')
+print('       ||')
+print('       VV')
+print('')
+print(x_train[len(x_train)-1])
+print('************* Train data Y *************')
+print(y_train[0])
+print('')
+print('       ||')
+print('       VV')
+print('')
+print(y_train[len(y_train)-1])
+
+clear_msg()
+
+print('************* Pred data X *************')
+print(x_pred[0])
+
+clear_msg()
+
+####  
+#####  データの標準化
+##### 
+x_train = (x_train - data_mean) / data_std
+y_train = (y_train - data_mean) / data_std
+x_val   = (x_val   - data_mean) / data_std
+y_val   = (y_val   - data_mean) / data_std
+x_pred  = (x_pred  - data_mean) / data_std
+
+print(x_pred)
+
+clear_msg()
+
+####  
+#####  モデルの作成
+##### 
+BATCH_SIZE = 256
+BUFFER_SIZE = 10000
+
+train_data = tf_data.Dataset.from_tensor_slices((x_train, y_train))
+train_data = train_data.cache().shuffle(BUFFER_SIZE).batch(BATCH_SIZE).repeat()
+ 
+val_data = tf_data.Dataset.from_tensor_slices((x_val, y_val))
+val_data = val_data.batch(BATCH_SIZE).repeat()
+
+model = Sequential()
+model.add(LSTM(1028, input_shape=(PAST_HISTORY, 7), kernel_initializer=initializers.TruncatedNormal()))
+model.add(Dense(2048, kernel_initializer=initializers.TruncatedNormal())) 
+model.add(Dense(7)) 
+model.compile(optimizer=optimizers.RMSprop(learning_rate=0.000001), loss='mae')
+
+print(model.summary())
+
+clear_msg()
+
+##### 
+#####　トレーニングの実行
+#####
+EVALUATION_INTERVAL = 10
+EPOCHS = 150
+
+callbacks = [EarlyStopping(monitor = 'val_loss', patience= int(EPOCHS / 3), restore_best_weights=True)]
+
+history = model.fit(train_data, epochs=EPOCHS, steps_per_epoch=EVALUATION_INTERVAL,
+                                               validation_data=val_data,
+                                               callbacks = callbacks,
+                                               validation_steps=50)
+
+clear_msg()
+
+####
+#####　トレーニングロスとバリデーションロスのグラフ表示
+#####
+def plot_train_history(history, title):
+    
+    loss = history.history['loss']
+    val_loss = history.history['val_loss'] 
+    epochs = range(len(loss))
+ 
+    plt.figure() 
+    plt.plot(epochs, loss, 'b', label='Training loss')
+    plt.plot(epochs, val_loss, 'r', label='Validation loss')
+    plt.title(title)
+    plt.legend() 
+    plt.show()
+
+plot_train_history(history, 'Training and validation loss')
+
+#####　バリデーションロスの最小値を表示
+loss = history.history['val_loss']
+loss_index = np.argmin(loss)
+loss_now = loss[loss_index]
+loss_now = np.around(loss_now, decimals=4)
+
+print('Epoch: {}'.format(str(loss_index) + '/' + str(len(loss))))
+print('Validation loss min: {}'.format(loss_now))
+
+clear_msg()
+
+##### 
+#####　予想の実行
+#####
+f_predict = model.predict(x_pred)
+##### 標準化されたデータを平均と標準偏差で戻す
+f_predict = f_predict * data_std + data_mean 
+f_predict = f_predict.reshape(7)
+#####　整数化
+predict = f_predict + 0.5
+predict = predict.astype(int)
+predict.sort()
+
+##### 
+#####　ファイルの書き込み
+#####
+
+#####　日時の取得
+dt_now = datetime.datetime.now()
+date_now = dt_now.strftime('%Y/%m/%d')
+
+#####　バリデーションロスの最小値
+loss = history.history['val_loss']
+loss_now = np.amin(loss)
+loss_now = np.around(loss_now, decimals=4)
+
+#####　データのセット
+item = [] 
+item.append(nbr_next)
+item.append(date_now) 
+item.append(loss_now)
+item.append(predict[0]) 
+item.append(predict[1])
+item.append(predict[2])
+item.append(predict[3])
+item.append(predict[4])
+item.append(predict[5])
+item.append(predict[6])
+#####　レコードの作成
+rec=[]
+rec.append(item)
+
+#####　実書き込み
+if clear_message == False:
+    with open(file_name, 'w') as f:
+        writer = csv.writer(f)
+        #writer.writerows(rec)
+
+
+#####
+print ('*******************************************')
+print ('*** 開催回        : {}回'.format(nbr_next))
+print ('*** 予測 (float)  : {}'.format('[' + str(f_predict[0]) + ' ' + str(f_predict[1]) 
+                                    + ' ' + str(f_predict[2]) + ' ' + str(f_predict[3])
+                                    + ' ' + str(f_predict[4]) + ' ' + str(f_predict[5])
+                                    + ' ' + str(f_predict[6]) + ']'  ))
+print ('*** 予測 (integer): {}'.format(predict))
+print ('*******************************************')
+print ('')
+print ('ロト７の購入は自己責任でお願いします')
+#####
+clear_msg()
+
