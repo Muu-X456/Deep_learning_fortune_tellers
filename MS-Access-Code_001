@@ -1,0 +1,9 @@
+Option Compare Database
+Option Explicit
+
+Const OutFile7N = "Z:\ディープラーニング占いの館\Loto7\pyData\normal7.csv"
+
+Function Export_Normal7()
+  DoCmd.TransferText acExportDelim, "SpecNormal7", "QRY_OfficalResult", OutFile7N, True
+  MsgBox "Csvファイルに変換されました"
+End Function
