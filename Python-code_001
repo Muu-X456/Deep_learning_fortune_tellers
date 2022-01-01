@@ -119,7 +119,7 @@ data_mean = np.mean(dataset[TRAIN_SPLIT:]) #.mean(axis=0)
 data_std = np.std(dataset[TRAIN_SPLIT:])   #.std(axis=0)
 
 ### データ作成パラメタ
-PAST_HISTORY = 8
+PAST_HISTORY = 13
 FUTURE_TARGET = 1
 STEP = 1
 #####　トレーニングデータの作成
@@ -231,7 +231,7 @@ val_data = tf_data.Dataset.from_tensor_slices((x_val, y_val))
 val_data = val_data.batch(BATCH_SIZE).repeat()
 
 model = Sequential()
-model.add(LSTM(1028, input_shape=(PAST_HISTORY, 7), kernel_initializer=initializers.TruncatedNormal()))
+model.add(LSTM(28, input_shape=(PAST_HISTORY, 7), kernel_initializer=initializers.TruncatedNormal()))
 model.add(Dense(2048, kernel_initializer=initializers.TruncatedNormal())) 
 model.add(Dense(7)) 
 model.compile(optimizer=optimizers.RMSprop(learning_rate=0.000001), loss='mae')
