@@ -3,7 +3,835 @@ Option Explicit
 
 Const OutFile7N = "Z:\ディープラーニング占いの館\Loto7\pyData\normal7.csv"
 
+Function Main()
+
+    Call MsgBox("Start", vbOKOnly, "ImportExport")
+    
+    Call Export_Normal7
+    Call Add_TBL_PredictEvaluation
+    Call Update_TBL_PredictEvaluation
+    
+    Call MsgBox("END")
+
+End Function
+
+
+
 Function Export_Normal7()
   DoCmd.TransferText acExportDelim, "SpecNormal7", "QRY_OfficalResult", OutFile7N, True
   MsgBox "Csvファイルに変換されました"
 End Function
+
+'######################################################################################
+
+Option Compare Database
+Option Explicit
+
+Const pResultFolder As String = "Z:\ディープラーニング占いの館\Loto7\pyResult"
+
+Sub Add_TBL_PredictEvaluation()
+
+    Dim RC As Recordset
+    Dim FileNames As Variant
+    Dim wFile1 As Variant
+    Dim wFile2 As Variant
+    Dim Cnt As Long
+    Dim Cond As String
+    Dim TableName As String
+    Dim FilePath As String
+    Dim FileNo As Long
+    Dim Rec As String
+    Dim Items As Variant
+    Dim i As Long
+    Dim j As Long
+    Dim k As Long
+    
+    
+    FileNames = FilesInFolder(pResultFolder)
+    If FileNames(0) = "NoData" Then
+        Exit Sub
+    End If
+    For i = LBound(FileNames) To UBound(FileNames)
+    
+        wFile1 = Split(FileNames(i), ".")
+        wFile2 = Split(wFile1(0), "_")
+        
+        TableName = ""
+        Select Case wFile2(0)
+            Case "result7"
+                TableName = "TBL_PredictEvaluation"
+        End Select
+        
+        Cnt = 0
+        Cond = "[Number]=" & wFile2(3) & " And [PredType]=" & wFile2(1) & " And [SeedNum]=" & wFile2(2)
+        Cnt = DCount("*", TableName, Cond)
+        If Cnt = 0 Then
+            FilePath = pResultFolder & "\" & FileNames(i)
+            FileNo = FreeFile(0)
+            Open FilePath For Input As #FileNo
+            Set RC = CurrentDb.OpenRecordset(TableName)
+            Do Until EOF(FileNo)
+                Line Input #FileNo, Rec
+                If Rec <> "" Then
+                    Items = Split(Rec, ",")
+                    
+                    RC.AddNew
+                    RC.Fields(0) = wFile2(3)
+                    RC.Fields(1) = wFile2(1)
+                    RC.Fields(2) = wFile2(2)
+                    RC.Fields(3) = Items(2)
+        
+                    
+                    k = 3
+                    If CInt(Items(4)) < CInt(Items(5)) Then
+                        For j = 3 To UBound(Items)
+                            k = k + 1
+                            RC.Fields(k) = Items(j)
+                        Next j
+                    Else
+                        For j = UBound(Items) To 3 Step -1
+                            k = k + 1
+                            RC.Fields(k) = Items(j)
+                        Next j
+                    End If
+                    RC.Update
+                End If
+            Loop
+            Close #FileNo
+            RC.Close
+            Set RC = Nothing
+        End If
+    Next i
+    
+End Sub
+
+
+
+
+Function Update_TBL_PredictEvaluation()
+
+    Dim SQL1 As String
+    Dim SQL2 As String
+    Dim SQL3 As String
+
+    SQL1 = "UPDATE TBL_PredictEvaluation INNER JOIN TBL_OfficalResult ON TBL_PredictEvaluation.Number = TBL_OfficalResult.開催回 "
+    SQL1 = SQL1 & "SET TBL_PredictEvaluation.Result1 = [第1数字], TBL_PredictEvaluation.Result2 = [第2数字], TBL_PredictEvaluation.Result3 = [第3数字], "
+    SQL1 = SQL1 & "TBL_PredictEvaluation.Result4 = [第4数字], TBL_PredictEvaluation.Result5 = [第5数字], TBL_PredictEvaluation.Result6 = [第6数字], "
+    SQL1 = SQL1 & "TBL_PredictEvaluation.Result7 = [第7数字], TBL_PredictEvaluation.Carry = [キャリーオーバー]"
+
+    SQL2 = "UPDATE TBL_PredictEvaluation SET TBL_PredictEvaluation.Evaluation = CheckResult7([Value1],[Value2],[Value3],[Value4],[Value5],[Value6],[Value7], "
+    SQL2 = SQL2 & "[result1],[result2],[result3],[result4],[result5],[result6],[result7]) WHERE ((TBL_PredictEvaluation.Evaluation) Is Null)"
+    
+    SQL3 = "UPDATE TBL_PredictEvaluation SET TBL_PredictEvaluation.MatchCount = CheckMatch7([Value1],[Value2],[Value3],[Value4],[Value5],[Value6],[Value7], "
+    SQL3 = SQL3 & "[result1],[result2],[result3],[result4],[result5],[result6],[result7]) WHERE ((TBL_PredictEvaluation.MatchCount) Is Null)"
+    
+    CurrentDb.Execute SQL1
+    CurrentDb.Execute SQL2
+    CurrentDb.Execute SQL3
+    
+End Function
+
+'######################################################################################
+
+Option Compare Database
+Option Explicit
+
+
+Function CheckResultM(p1, p2, p3, p4, p5, r1, r2, r3, r4, r5) As Variant
+    Dim plan(4) As Integer
+    Dim rslt(4) As Integer
+    Dim i As Long
+    Dim Result As Double
+    
+    If IsNull(r1) Then
+        CheckResultM = Null
+        Exit Function
+    End If
+    
+    If p1 < p5 Then
+        plan(0) = p1
+        plan(1) = p2
+        plan(2) = p3
+        plan(3) = p4
+        plan(4) = p5
+    Else
+        plan(0) = p5
+        plan(1) = p4
+        plan(2) = p3
+        plan(3) = p2
+        plan(4) = p1
+    End If
+    
+    If r1 < r5 Then
+        rslt(0) = r1
+        rslt(1) = r2
+        rslt(2) = r3
+        rslt(3) = r4
+        rslt(4) = r5
+    Else
+        rslt(0) = r5
+        rslt(1) = r4
+        rslt(2) = r3
+        rslt(3) = r2
+        rslt(4) = r1
+    End If
+    
+    Result = 0
+    For i = 0 To 4
+        Result = Result + Abs(plan(i) - rslt(i))
+    Next i
+    Result = Result * 100 / 5
+    Result = Fix(Result) / 100
+    
+    CheckResultM = Result
+    
+
+End Function
+
+Function CheckResult6(p1, p2, p3, p4, p5, p6, r1, r2, r3, r4, r5, r6) As Variant
+
+    Dim plan(5) As Integer
+    Dim rslt(5) As Integer
+    Dim i As Long
+    Dim Result As Double
+    
+    If IsNull(r1) Then
+        CheckResult6 = Null
+        Exit Function
+    End If
+    
+    
+    If p1 < p6 Then
+        plan(0) = p1
+        plan(1) = p2
+        plan(2) = p3
+        plan(3) = p4
+        plan(4) = p5
+        plan(5) = p6
+    Else
+        plan(0) = p6
+        plan(1) = p5
+        plan(2) = p4
+        plan(3) = p3
+        plan(4) = p2
+        plan(5) = p1
+    End If
+    
+    If r1 < r6 Then
+        rslt(0) = r1
+        rslt(1) = r2
+        rslt(2) = r3
+        rslt(3) = r4
+        rslt(4) = r5
+        rslt(5) = r6
+    Else
+        rslt(0) = r6
+        rslt(1) = r5
+        rslt(2) = r4
+        rslt(3) = r3
+        rslt(4) = r2
+        rslt(5) = r1
+    End If
+    
+    Result = 0
+    For i = 0 To 5
+        Result = Result + Abs(plan(i) - rslt(i))
+    Next i
+    Result = Result * 100 / 6
+    Result = Fix(Result) / 100
+    
+    CheckResult6 = Result
+    
+
+End Function
+
+
+
+
+Function CheckResult7(p1, p2, p3, p4, p5, p6, p7, r1, r2, r3, r4, r5, r6, r7) As Variant
+
+    Dim plan(6) As Integer
+    Dim rslt(6) As Integer
+    Dim i As Long
+    Dim Result As Double
+    
+    If IsNull(r1) Then
+        CheckResult7 = Null
+        Exit Function
+    End If
+    
+    
+    If p1 < p7 Then
+        plan(0) = p1
+        plan(1) = p2
+        plan(2) = p3
+        plan(3) = p4
+        plan(4) = p5
+        plan(5) = p6
+        plan(6) = p7
+    Else
+        plan(0) = p7
+        plan(1) = p6
+        plan(2) = p4
+        plan(3) = p4
+        plan(4) = p3
+        plan(5) = p2
+        plan(6) = p1
+    End If
+    
+    If r1 < r7 Then
+        rslt(0) = r1
+        rslt(1) = r2
+        rslt(2) = r3
+        rslt(3) = r4
+        rslt(4) = r5
+        rslt(5) = r6
+        rslt(6) = r7
+    Else
+        rslt(0) = r7
+        rslt(1) = r6
+        rslt(2) = r5
+        rslt(3) = r4
+        rslt(4) = r3
+        rslt(5) = r2
+        rslt(6) = r1
+    End If
+    
+    Result = 0
+    For i = 0 To 6
+        Result = Result + Abs(plan(i) - rslt(i))
+    Next i
+    Result = Result * 100 / 7
+    Result = Fix(Result) / 100
+    
+    CheckResult7 = Result
+    
+
+End Function
+
+Function CheckMatchM(p1, p2, p3, p4, p5, r1, r2, r3, r4, r5) As Variant
+    Dim plan(4) As Integer
+    Dim rslt(4) As Integer
+    Dim i As Long
+    Dim j As Long
+    Dim Result As Long
+    
+    If IsNull(r1) Then
+        CheckMatchM = Null
+        Exit Function
+    End If
+
+    plan(0) = p1
+    plan(1) = p2
+    plan(2) = p3
+    plan(3) = p4
+    plan(4) = p5
+      
+    rslt(0) = r1
+    rslt(1) = r2
+    rslt(2) = r3
+    rslt(3) = r4
+    rslt(4) = r5
+    
+    Result = 0
+    
+    For i = 0 To 4
+        For j = 0 To 4
+            If plan(i) = rslt(j) Then
+                Result = Result + 1
+                Exit For
+            End If
+        Next j
+    Next i
+    
+    CheckMatchM = Result
+    
+
+End Function
+
+Function CheckMatch6(p1, p2, p3, p4, p5, p6, r1, r2, r3, r4, r5, r6) As Variant
+
+    Dim plan(5) As Integer
+    Dim rslt(5) As Integer
+    Dim i As Long
+    Dim j As Long
+    Dim Result As Long
+    
+    If IsNull(r1) Then
+        CheckMatch6 = Null
+        Exit Function
+    End If
+
+    plan(0) = p1
+    plan(1) = p2
+    plan(2) = p3
+    plan(3) = p4
+    plan(4) = p5
+    plan(5) = p6
+
+    rslt(0) = r1
+    rslt(1) = r2
+    rslt(2) = r3
+    rslt(3) = r4
+    rslt(4) = r5
+    rslt(5) = r6
+    
+    Result = 0
+    
+    For i = 0 To 5
+        For j = 0 To 5
+            If plan(i) = rslt(j) Then
+                Result = Result + 1
+                Exit For
+            End If
+        Next j
+    Next i
+
+    CheckMatch6 = Result
+    
+
+End Function
+
+
+Function CheckMatch7(p1, p2, p3, p4, p5, p6, p7, r1, r2, r3, r4, r5, r6, r7) As Variant
+
+    Dim plan(6) As Integer
+    Dim rslt(6) As Integer
+    Dim i As Long
+    Dim j As Long
+    Dim Result As Long
+    
+    If IsNull(r1) Then
+        CheckMatch7 = Null
+        Exit Function
+    End If
+    
+    plan(0) = p1
+    plan(1) = p2
+    plan(2) = p3
+    plan(3) = p4
+    plan(4) = p5
+    plan(5) = p6
+    plan(6) = p7
+    
+    rslt(0) = r1
+    rslt(1) = r2
+    rslt(2) = r3
+    rslt(3) = r4
+    rslt(4) = r5
+    rslt(5) = r6
+    rslt(6) = r7
+    
+    Result = 0
+   
+    For i = 0 To 6
+        For j = 0 To 6
+            If plan(i) = rslt(j) Then
+                Result = Result + 1
+                Exit For
+            End If
+        Next j
+    Next i
+    
+    
+    CheckMatch7 = Result
+    
+
+End Function
+
+'######################################################################################
+
+Option Compare Database
+Option Explicit
+
+'[参照設定] Microsoft Scripting Runtime
+
+Sub CreateFolder(Path As String)
+
+'== Folderを作成する
+
+    Const myName = "CreateFolder"
+
+
+    Dim FSO As Object
+    Set FSO = CreateObject("Scripting.FileSystemObject")
+    FSO.CreateFolder Path
+    Set FSO = Nothing
+    
+    Exit Sub
+
+    
+End Sub
+
+Function FolderIsExist(Path As String) As Boolean
+
+'== Folderが存在するかどうかを受け取る
+
+    Const myName = "FolderIsExist"
+    
+
+    Dim FSO As Object
+    Set FSO = CreateObject("Scripting.FileSystemObject")
+    If FSO.FolderExists(Path) Then
+        FolderIsExist = True
+    Else
+        FolderIsExist = False
+    End If
+    Set FSO = Nothing
+    
+    Exit Function
+
+ 
+End Function
+
+Function FileIsExist(Path As String) As Boolean
+
+'== Fileが存在するかどうかを受け取る
+
+    Const myName = "FileIsExist"
+  
+    Dim FSO As Object
+    Set FSO = CreateObject("Scripting.FileSystemObject")
+    If FSO.FileExists(Path) Then
+        FileIsExist = True
+    Else
+        FileIsExist = False
+    End If
+    Set FSO = Nothing
+    
+    Exit Function
+
+     
+End Function
+
+Sub CopyFile(FromPath As String, ToPath As String)
+
+'== Fileをコピーする
+
+    Const myName = "CopyFile"
+   
+    Dim FSO As Object
+    Set FSO = CreateObject("Scripting.FileSystemObject")
+    FSO.CopyFile FromPath, ToPath
+    Set FSO = Nothing
+    
+    Exit Sub
+
+     
+End Sub
+
+Sub DeleteFile(Path As String)
+
+'== Fileを削除する
+
+    Const myName = "DeleteFile"
+    
+    Dim FSO As Object
+    Set FSO = CreateObject("Scripting.FileSystemObject")
+    FSO.DeleteFile Path
+    Set FSO = Nothing
+    
+    Exit Sub
+
+     
+End Sub
+
+Sub CreateTextFile(FileName As String)
+
+'== Text Fileを作成する
+
+    Const myName = "CreateTextFile"
+ 
+    
+    Dim FSO As Object
+    Dim TS As Object
+    Dim i As Integer
+    
+    Set FSO = CreateObject("Scripting.FileSystemObject")
+    Set TS = FSO.CreateTextFile(FileName:=FileName, Overwrite:=True, unicode:=True)
+    For i = 0 To 100
+        TS.WriteLine "Line" & i  '一行づつ書き込むとき
+    Next i
+    
+    'TS.Write Data　　　　　     'Streamで書き込むとき
+    
+    TS.Close
+    Set TS = Nothing
+    Set FSO = Nothing
+    
+    Exit Sub
+
+ 
+ 
+ End Sub
+ 
+Function ReadCsvFile(Path As String) As String()
+
+'== CSV File Allを読込む
+
+    Const myName = "ReadCsvFile"
+   
+
+    Const Demili_RecEnd As String = vbCrLf
+    Const Demili_Fld    As String = vbTab
+
+    Dim FSO      As Object
+    Dim Stream   As Object
+    Dim Buf_File As String
+    Dim Buf_Rec  As Variant
+    Dim Buf_Fld  As Variant
+    Dim Rst() As String
+    
+    Dim RecNo As Long
+    Dim FldNo As Long
+    
+    Dim i As Long, j As Long
+    
+    Set FSO = CreateObject("Scripting.FileSystemObject")
+    Set Stream = FSO.GetFile(Path).OpenAsTextStream
+    
+    If Not Stream.AtEndOfStream Then
+        Buf_File = Stream.ReadAll
+    End If
+    
+    Stream.Close
+    
+    Set Stream = Nothing
+    Set FSO = Nothing
+    
+    If Buf_File <> "" Then
+    
+        Buf_Rec = Split(Buf_File, Demili_RecEnd)
+        RecNo = UBound(Buf_Rec)
+    
+        Buf_Fld = Split(Buf_Rec(0), Demili_Fld)
+        FldNo = UBound(Buf_Fld)
+        
+        ReDim Rst(RecNo, FldNo)
+        
+        For i = 0 To RecNo
+            Buf_Fld = Split(Buf_Rec(i), Demili_Fld)
+            For j = 0 To UBound(Buf_Fld)
+                If j <= FldNo Then
+                    Rst(i, j) = Buf_Fld(j)
+                End If
+            Next j
+        Next i
+    
+    Else
+    
+        ReDim Rst(0, 0)
+        Rst(0, 0) = "NoData"
+        
+    End If
+        
+    ReadCsvFile = Rst
+    
+    Exit Function
+ 
+    
+End Function
+
+Function ReadTextFileByLine(FileName As String) As String
+
+'== Text Fileを1行づつ読み込む
+
+    Const myName = "ReadTextFileByLine"
+ 
+
+    Dim FSO     As Object
+    Dim t_File  As Object
+    Dim txt     As String
+
+    Set FSO = CreateObject("Scripting.FileSystemObject")
+    Set t_File = FSO.OpenTextFile(FileName)
+    
+    txt = ""
+
+    With t_File
+        Do Until .AtEndOfStream     'ファイル末尾まで繰り返し
+            Debug.Print "行 = " & .Line & "　位置 = " & .Column & "　値 = " & .readline
+            txt = txt & .readline & vbCrLf
+            Debug.Print txt
+        Loop
+        .Close  'ファイルのクローズ
+    End With
+    
+    If txt <> "" Then
+        txt = Left(txt, Len(txt) - 1)
+    End If
+
+    Set t_File = Nothing
+    Set FSO = Nothing
+    
+    ReadTextFileByLine = txt
+    
+    Exit Function
+ 
+
+End Function
+
+Function ReadTextFileAll(FileName As String) As String
+
+'== Text File Allを読込む
+
+    Const myName = "ReadTextFileAll"
+   
+    Dim FSO      As Object
+    Dim Stream   As Object
+    Dim Buf_File As String
+    
+    Set FSO = CreateObject("Scripting.FileSystemObject")
+    Set Stream = FSO.GetFile(FileName).OpenAsTextStream
+    
+    If Not Stream.AtEndOfStream Then
+        Buf_File = Stream.ReadAll
+    End If
+    
+    Stream.Close
+    
+    Set Stream = Nothing
+    Set FSO = Nothing
+    
+    ReadTextFileAll = Buf_File
+    
+    Exit Function
+ 
+End Function
+
+Function FilesInFolder(FolderPath As String) As String()
+
+'== Folder内のFile Allを受け取る
+
+    Const myName = "FilesInFolder"
+ 
+    Dim FSO      As Object
+    Dim f_Obj As Variant
+    Dim BaseNames() As String
+    Dim i As Long
+
+    
+    Set FSO = CreateObject("Scripting.FileSystemObject")
+    i = FSO.GetFolder(FolderPath).Files.Count
+    If i = 0 Then
+        ReDim BaseNames(0)
+        BaseNames(0) = "NoData"
+    Else
+        ReDim BaseNames(i - 1)
+        
+        i = -1
+        For Each f_Obj In FSO.GetFolder(FolderPath).Files
+            i = i + 1
+            BaseNames(i) = f_Obj.Name
+        Next f_Obj
+    
+    End If
+    
+    FilesInFolder = BaseNames
+    
+    Set FSO = Nothing
+    
+    Exit Function
+ 
+
+End Function
+ 
+Function FoldersInFolder(FolderPath As String) As String()
+
+'== Folder内のFolder Allを受け取る
+
+    Const myName = "FoldersInFolder"
+  
+
+    Dim FSO      As Object
+    Dim f_Obj As Variant
+    Dim BaseNames() As String
+    Dim i As Long
+    
+    Set FSO = CreateObject("Scripting.FileSystemObject")
+    i = FSO.GetFolder(FolderPath).SubFolders.Count
+    If i = 0 Then
+        ReDim BaseNames(0)
+        BaseNames(0) = "NoData"
+    Else
+        ReDim BaseNames(i - 1)
+        
+        i = -1
+        For Each f_Obj In FSO.GetFolder(FolderPath).SubFolders
+            i = i + 1
+            BaseNames(i) = f_Obj.Name
+        Next f_Obj
+    
+    End If
+    
+    FoldersInFolder = BaseNames
+    
+    Set FSO = Nothing
+    
+    Exit Function
+
+ 
+
+End Function
+
+Function FileIsAccess(Path As String) As Boolean
+
+'== AccessFileが存在するかどうかを受け取る
+
+    Const myName = "FileIsAccess"
+ 
+
+    Const AccessFileMarker = "Standard ACE DB"
+
+    Dim FSO      As Object
+    Dim Stream   As Object
+    Dim Buf_File As String
+    
+    FileIsAccess = False
+    
+    Set FSO = CreateObject("Scripting.FileSystemObject")
+    If FSO.FileExists(Path) Then
+        
+        Set Stream = FSO.GetFile(Path).OpenAsTextStream
+        If Not Stream.AtEndOfStream Then
+            Buf_File = Stream.Read(20)
+            If InStr(Buf_File, AccessFileMarker) > 0 Then
+                FileIsAccess = True
+            End If
+        End If
+        Stream.Close
+        Set Stream = Nothing
+        
+    End If
+    Set FSO = Nothing
+    
+Exit Function
+
+ 
+
+End Function
+
+Function FileIsMe(Path As String) As Boolean
+
+'== FileがMeかどうかを受け取る
+
+    Const myName = "FileIsMe"
+    
+    Dim wPath As String
+    
+    wPath = CurrentProject.FullName
+    
+    If wPath = Path Then
+         FileIsMe = True
+    Else
+         FileIsMe = False
+    End If
+        
+Exit Function
+
+
+
+End Function
+
+'######################################################################################
+
